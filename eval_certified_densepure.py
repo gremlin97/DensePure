@@ -21,6 +21,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForImageClassification, AutoFeatureExtractor
 import timm
 from networks import *
+from runners.cm_densepure import *
 
 IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_DEFAULT_STD = (0.229, 0.224, 0.225)
@@ -29,7 +30,8 @@ class DensePure_Certify(nn.Module):
     def __init__(self, args, config):
         super().__init__()
         self.args = args
-
+        # if device is None:
+        #     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         # image classifier
         if args.domain == 'cifar10':
             if args.advanced_classifier=='vit':
@@ -44,7 +46,8 @@ class DensePure_Certify(nn.Module):
                 raise NotImplementedError('no classifier')
         elif args.domain == 'imagenet':
             if args.advanced_classifier=='beit':
-                self.classifier = timm.create_model('beit_large_patch16_512', checkpoint_path='pretrained/beit_large_patch16_512_pt22k_ft22kto1k.pth').cuda()
+                # self.classifier = timm.create_model('beit_large_patch16_512', checkpoint_path='pretrained/beit_large_patch16_512_pt22k_ft22kto1k.pth').cuda()
+                self.classifier = timm.create_model('beit_large_patch16_512').cuda()
                 self.classifier.eval()
             elif args.advanced_classifier=='WRN':
                 self.classifier = timm.create_model('wide_resnet50_2', pretrained=True).cuda()
@@ -66,6 +69,8 @@ class DensePure_Certify(nn.Module):
             self.runner = GuidedDiffusion(args, config, device=config.device)
         elif args.diffusion_type == 'ddpm':
             self.runner = Diffusion(args, config, device=config.device)
+        elif args.diffusion_type == 'cm':
+            self.runner = CM(args, config, device=config.device)
         else:
             raise NotImplementedError('unknown diffusion type')
 
@@ -86,11 +91,15 @@ class DensePure_Certify(nn.Module):
         start_time = time()
         x_re = self.runner.image_editing_sample((x - 0.5) * 2, bs_id=counter, tag=self.tag, sigma=self.args.sigma)
         minutes, seconds = divmod(time() - start_time, 60)
+        print("Output of CT:",x_re)
 
         # if self.args.save_info:
         #     np.save(self.args.image_folder+'/'+str(sample_id)+'-'+str(counter)+'-img_after_purify.npy',x_re.clone().detach().cpu().numpy())
-
+        print("X Shape is:",x_re.shape)
+        print("X Type is:",type(x_re))
+        x_re = x_re.float()
         if 'imagenet' in self.args.domain:
+            x_re = x_re.permute(0,3,1,2)
             if self.args.advanced_classifier=='beit':
                 x_re = F.interpolate(x_re, size=(512, 512), mode='bicubic')
             else:
@@ -135,7 +144,9 @@ class DensePure_Certify(nn.Module):
         elif self.args.advanced_classifier=='beit':
             with torch.no_grad():
                 self.classifier.eval()
+                print("Class shape",x_re.shape)
                 out = self.classifier(x_re)
+                print("Out is",out)
 
         elif self.args.advanced_classifier=='resnet':
             with torch.no_grad():

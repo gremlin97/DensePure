@@ -3,6 +3,7 @@ import os
 import pickle
 
 from PIL import Image
+import random
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -11,7 +12,7 @@ from torchvision.datasets.utils import check_integrity
 from typing import *
 from zipdata import ZipData
 
-IMAGENET_DIR = "/home/datasets/imagenet"
+IMAGENET_DIR = "/home/kkasodek/densepure/DensePure/imagenet"
 
 # list of all datasets
 DATASETS = ["imagenet", "imagenet32", "cifar10"]
@@ -93,7 +94,8 @@ def _imagenet(split: str) -> Dataset:
             transforms.ToTensor()
         ])
     elif split == "test":
-        subdir = os.path.join(dir, "val")
+        # subdir = os.path.join(dir, "val")
+        subdir = dir
         transform = transforms.Compose([
             transforms.Resize(256, interpolation=3),
             transforms.CenterCrop(256),
