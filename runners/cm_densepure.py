@@ -71,13 +71,8 @@ class CM(torch.nn.Module):
         self.reverse_state_cuda = None
 
         print("Loading model")
-        # defaults = model_and_diffusion_defaults(self.args.t_total)
         defaults = model_and_diffusion_defaults()
         model, diffusion = create_model_and_diffusion(**defaults)
-        # model, diffusion = create_model_and_diffusion(
-        # **args_to_dict(args, model_and_diffusion_defaults().keys()),
-        # distillation=False,
-        #  )
         model.load_state_dict(
             dist_util.load_state_dict("pretrained/ct_imagenet64.pt", map_location="cpu")
         )
@@ -133,14 +128,14 @@ class CM(torch.nn.Module):
 
             if self.args.use_clustering:
                 x0 = x0.unsqueeze(1).repeat(1,self.args.clustering_batch,1,1,1).view(batch_size*self.args.clustering_batch,3,32,32)
-
+                
+            # Intially we are only experimenting with one step denoising
             if self.args.use_one_step:
                 # one step denoise
                 t = torch.tensor([round(t)] * x0.shape[0], device=self.device)
                 generator = get_generator("determ",1,0)
                 
                 x_T = x0
-                #x_T = x_T.cpu().detach().numpy()
                 sample = stochastic_iterative_sampler(
                     self.denoiser,
                     x_T,
@@ -159,92 +154,3 @@ class CM(torch.nn.Module):
             print("Output Sample is",sample)
             print("Output Sample shape is",sample.shape)
             return sample
-
-            # elif self.args.use_t_steps:
-
-            #     #save random state
-            #     if self.args.save_predictions:
-            #         global_seed_state = torch.random.get_rng_state()
-            #         if torch.cuda.is_available():
-            #             global_cuda_state = torch.cuda.random.get_rng_state_all()
-
-            #         if self.reverse_state==None:
-            #             torch.manual_seed(self.args.reverse_seed)
-            #             if torch.cuda.is_available():
-            #                 torch.cuda.manual_seed_all(self.args.reverse_seed)
-            #         else:
-            #             torch.random.set_rng_state(self.reverse_state)
-            #             if torch.cuda.is_available():
-            #                 torch.cuda.random.set_rng_state_all(self.reverse_state_cuda)
-
-            #     # t steps denoise
-            #     inter = t/self.args.num_t_steps
-            #     indices_t_steps = [round(t-i*inter) for i in range(self.args.num_t_steps)]
-                
-            #     for i in range(len(indices_t_steps)):
-            #         t = torch.tensor([len(indices_t_steps)-i-1] * x0.shape[0], device=self.device)
-            #         real_t = torch.tensor([indices_t_steps[i]] * x0.shape[0], device=self.device)
-            #         with torch.no_grad():
-            #             out = self.diffusion.p_sample(
-            #                 self.model,
-            #                 x0,
-            #                 t,
-            #                 clip_denoised=True,
-            #                 indices_t_steps = indices_t_steps.copy(),
-            #                 T = self.args.t_total,
-            #                 step = len(indices_t_steps)-i,
-            #                 real_t = real_t
-            #             )
-            #             x0 = out["sample"]
-
-            #     #load random state
-            #     if self.args.save_predictions:
-            #         self.reverse_state = torch.random.get_rng_state()
-            #         if torch.cuda.is_available():
-            #             self.reverse_state_cuda = torch.cuda.random.get_rng_state_all()
-
-            #         torch.random.set_rng_state(global_seed_state)
-            #         if torch.cuda.is_available():
-            #             torch.cuda.random.set_rng_state_all(global_cuda_state)
-
-            # else:
-            #     #save random state
-            #     if self.args.save_predictions:
-            #         global_seed_state = torch.random.get_rng_state()
-            #         if torch.cuda.is_available():
-            #             global_cuda_state = torch.cuda.random.get_rng_state_all()
-
-            #         if self.reverse_state==None:
-            #             torch.manual_seed(self.args.reverse_seed)
-            #             if torch.cuda.is_available():
-            #                 torch.cuda.manual_seed_all(self.args.reverse_seed)
-            #         else:
-            #             torch.random.set_rng_state(self.reverse_state)
-            #             if torch.cuda.is_available():
-            #                 torch.cuda.random.set_rng_state_all(self.reverse_state_cuda)
-
-            #     # full steps denoise
-            #     indices = list(range(round(t)))[::-1]
-            #     for i in indices:
-            #         t = torch.tensor([i] * x0.shape[0], device=self.device)
-            #         with torch.no_grad():
-            #             out = self.diffusion.p_sample(
-            #                 self.model,
-            #                 x0,
-            #                 t,
-            #                 clip_denoised=True,
-            #             )
-            #             x0 = out["sample"]
-
-            #     #load random state
-            #     if self.args.save_predictions:
-            #         self.reverse_state = torch.random.get_rng_state()
-            #         if torch.cuda.is_available():
-            #             self.reverse_state_cuda = torch.cuda.random.get_rng_state_all()
-
-            #         torch.random.set_rng_state(global_seed_state)
-            #         if torch.cuda.is_available():
-            #             torch.cuda.random.set_rng_state_all(global_cuda_state)
-
-            # return x0
-       

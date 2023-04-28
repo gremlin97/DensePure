@@ -2,7 +2,7 @@
 cd ..
 
 sigma=$1
-steps=$2
+steps=1
 reverse_seed=$2
 
 python eval_certified_densepure.py \
@@ -26,5 +26,3 @@ python eval_certified_densepure.py \
 --reverse_seed $reverse_seed 
 --save_predictions \
 --predictions_path exp/imagenet/$sigma- 
-# --use_t_steps \
-# --num_t_steps $steps \

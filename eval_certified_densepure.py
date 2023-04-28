@@ -99,7 +99,8 @@ class DensePure_Certify(nn.Module):
         print("X Type is:",type(x_re))
         x_re = x_re.float()
         if 'imagenet' in self.args.domain:
-            x_re = x_re.permute(0,3,1,2)
+            if args.diffusion_type == 'cm':
+                x_re = x_re.permute(0,3,1,2)
             if self.args.advanced_classifier=='beit':
                 x_re = F.interpolate(x_re, size=(512, 512), mode='bicubic')
             else:
