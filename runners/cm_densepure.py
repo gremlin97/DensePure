@@ -151,6 +151,102 @@ class CM(torch.nn.Module):
                 sample = sample.permute(0, 2, 3, 1)
                 sample = sample.contiguous()
                 
-            print("Output Sample is",sample)
-            print("Output Sample shape is",sample.shape)
+            # print("Output Sample is",sample)
+            # print("Output Sample shape is",sample.shape)
+            
+            
+            # elif self.args.use_t_steps:
+
+            #save random state
+            elif self.args.save_predictions:
+                global_seed_state = torch.random.get_rng_state()
+                if torch.cuda.is_available():
+                    global_cuda_state = torch.cuda.random.get_rng_state_all()
+
+                if self.reverse_state==None:
+                    torch.manual_seed(self.args.reverse_seed)
+                    if torch.cuda.is_available():
+                        torch.cuda.manual_seed_all(self.args.reverse_seed)
+                else:
+                    torch.random.set_rng_state(self.reverse_state)
+                    if torch.cuda.is_available():
+                        torch.cuda.random.set_rng_state_all(self.reverse_state_cuda)
+
+            # t steps denoise
+            inter = t/self.args.num_t_steps
+            indices_t_steps = [round(t-i*inter) for i in range(self.args.num_t_steps)]
+            
+            for i in range(len(indices_t_steps)):
+                t = torch.tensor([len(indices_t_steps)-i-1] * x0.shape[0], device=self.device)
+                real_t = torch.tensor([indices_t_steps[i]] * x0.shape[0], device=self.device)
+                generator = get_generator("determ",1,0)
+                
+                x_T = x0
+                with torch.no_grad():
+                    sample = stochastic_iterative_sampler(
+                        self.denoiser,
+                        x_T,
+                        sigmas = sigma,
+                        ts = [0,22,39],
+                        t_min=0.02,
+                        t_max=80,
+                        rho=self.diffusion.rho,
+                        steps=40,
+                        generator=generator,
+                     )
+                    sample = ((sample + 1) * 127.5).clamp(0, 255).to(th.uint8)
+                    sample = sample.permute(0, 2, 3, 1)
+                    sample = sample.contiguous()
+                    print("Output Sample is",sample)
+                    print("Output Sample shape is",sample.shape)   
+
+            #load random state
+            if self.args.save_predictions:
+                self.reverse_state = torch.random.get_rng_state()
+                if torch.cuda.is_available():
+                    self.reverse_state_cuda = torch.cuda.random.get_rng_state_all()
+
+                torch.random.set_rng_state(global_seed_state)
+                if torch.cuda.is_available():
+                    torch.cuda.random.set_rng_state_all(global_cuda_state)
+
+            else:
+                #save random state
+                if self.args.save_predictions:
+                    global_seed_state = torch.random.get_rng_state()
+                    if torch.cuda.is_available():
+                        global_cuda_state = torch.cuda.random.get_rng_state_all()
+
+                    if self.reverse_state==None:
+                        torch.manual_seed(self.args.reverse_seed)
+                        if torch.cuda.is_available():
+                            torch.cuda.manual_seed_all(self.args.reverse_seed)
+                    else:
+                        torch.random.set_rng_state(self.reverse_state)
+                        if torch.cuda.is_available():
+                            torch.cuda.random.set_rng_state_all(self.reverse_state_cuda)
+
+                # full steps denoise
+                indices = list(range(round(t)))[::-1]
+                for i in indices:
+                    t = torch.tensor([i] * x0.shape[0], device=self.device)
+                    with torch.no_grad():
+                        out = self.diffusion.p_sample(
+                            self.model,
+                            x0,
+                            t,
+                            clip_denoised=True,
+                        )
+                        x0 = out["sample"]
+
+                #load random state
+                if self.args.save_predictions:
+                    self.reverse_state = torch.random.get_rng_state()
+                    if torch.cuda.is_available():
+                        self.reverse_state_cuda = torch.cuda.random.get_rng_state_all()
+
+                    torch.random.set_rng_state(global_seed_state)
+                    if torch.cuda.is_available():
+                        torch.cuda.random.set_rng_state_all(global_cuda_state)
+                        
             return sample
